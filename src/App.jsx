@@ -92,12 +92,22 @@ const POLICY_LABELS = {
   safeWalkways: 'ทางเดินและทางม้าลายปลอดภัย'
 };
 
-const getRoleLabel = (role) => ROLE_LABELS[role] || role;
+const getRoleLabel = (role) => {
+  const normalized = String(role || '').trim();
+  const fallbackMap = {
+    student: 'นักศึกษา',
+    salaryman: 'พนักงานออฟฟิศ',
+    freelancer: 'ฟรีแลนซ์',
+    merchant: 'พ่อค้าแม่ค้า'
+  };
+  return ROLE_LABELS[normalized] || fallbackMap[normalized.toLowerCase()] || normalized;
+};
 const getZoneLabel = (zone) => ZONE_LABELS[zone] || zone;
 const getCrisisLabel = (type) => CRISIS_LABELS[type] || type;
 
 // เปิดปุ่มทดสอบชนะ/แพ้ชั่วคราว ถ้าจะส่งงานจริงให้เปลี่ยนเป็น false
 const SHOW_DEBUG_BUTTONS = true;
+const POST_TEST_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdLGuWVuVzUXleP_bSYWKt10g9YCjfrfjkqfbYIXkL3-Txfng/viewform?usp=publish-editor";
 
 const createDebugGameData = (gameState, userId = 'debug') => ({
   host: userId,
@@ -850,13 +860,22 @@ const handleLeaveLobby = () => {
                 </>
               )}
 
-              <div className="mt-8">
+              <div className="mt-8 space-y-3">
+                <a
+                  href={POST_TEST_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex w-full items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-500 py-4 text-sm font-black tracking-widest text-white transition-all hover:scale-[1.02] hover:from-emerald-500 hover:to-cyan-400 shadow-[0_0_24px_rgba(45,212,191,0.25)]"
+                >
+                  ทำแบบทดสอบหลังเล่น
+                </a>
+
                 <button
-  onClick={handleBackToMenu}
-  className="w-full rounded-2xl bg-blue-600 py-4 text-sm font-black tracking-widest text-white transition-all hover:scale-[1.02] hover:bg-blue-500 shadow-[0_0_24px_rgba(59,130,246,0.25)]"
->
-  กลับหน้าแรก
-</button>
+                  onClick={handleBackToMenu}
+                  className="w-full rounded-2xl bg-slate-800 py-4 text-sm font-black tracking-widest text-white transition-all hover:scale-[1.02] hover:bg-slate-700 border border-white/10"
+                >
+                  กลับหน้าแรก
+                </button>
               </div>
             </div>
           </div>
@@ -1179,9 +1198,9 @@ const handleLeaveLobby = () => {
               isUnclaimed ? 'text-slate-500' : 'text-white'
             }`}
           >
-            {c.role}{' '}
+            {getRoleLabel(c.role)}{' '}
             {isMine && !isUnclaimed && (
-              <span className="text-blue-400 text-[10px] ml-1 uppercase">(You)</span>
+              <span className="text-blue-400 text-[10px] ml-1 uppercase">(คุณ)</span>
             )}
           </div>
 
@@ -1344,7 +1363,7 @@ const handleLeaveLobby = () => {
     {renderContent()}
 
     <div className="fixed bottom-2 left-4 text-[9px] sm:text-xs text-slate-500/50 font-mono z-[100] pointer-events-none">
-      beta version 1.12
+      beta version 1.15
     </div>
 
     {/* DEBUG ONLY - ถ้าจะส่งงานจริงให้เปลี่ยน SHOW_DEBUG_BUTTONS เป็น false */}
