@@ -14,13 +14,13 @@ import polLogo from './assets/pol-logo.png';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
-  apiKey: "AIzaSyAkrhvM9TtdBl5laZ-QVSgZjm5boAicYcY",
-  authDomain: "poleveryday.firebaseapp.com",
-  projectId: "poleveryday",
-  storageBucket: "poleveryday.firebasestorage.app",
-  messagingSenderId: "641725643801",
-  appId: "1:641725643801:web:016d360044bc8cbfb5fe88",
-  measurementId: "G-VMGQYM1C8J"
+  apiKey: "AIzaSyBjEj83JkavzZiKrNZXxzTzFnCiecGTgjg",
+  authDomain: "poleveryday-508fd.firebaseapp.com",
+  projectId: "poleveryday-508fd",
+  storageBucket: "poleveryday-508fd.firebasestorage.app",
+  messagingSenderId: "894653544532",
+  appId: "1:894653544532:web:31f46034b25010284095c1",
+  measurementId: "G-EXN8L03SF8"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -223,6 +223,10 @@ const isMyTurn = () => {
   return activeCharOwner === user.uid;
 };
 
+const limitLogs = (logs, max = 30) => {
+  return logs.slice(-max);
+};
+
   const handleEndTurn = async (force = false) => {
   if (isEndingTurn.current) return;
   if (!force && !isMyTurn()) return;
@@ -304,17 +308,25 @@ const newTurnCount = isNewRound ? gameData.turnCount + 1 : gameData.turnCount;
   }
 
   try {
-    await syncState({
+    const updates = {
       turnIndex: nextIndex,
       turnCount: newTurnCount,
       characters: newChars,
       zones: newZones,
       panic: newPanic,
-      logs: newLogs,
+      logs: limitLogs(newLogs),
       studentFreeMove: newStudentFreeMove,
       gameState: finalState,
       turnEndTime: Date.now() + 30 * 1000
+    };
+
+    // อัปเดตในเครื่องก่อน เพื่อให้เครื่องที่กดจบเทิร์นเปลี่ยนทันที
+    setGameData({
+      ...gameData,
+      ...updates
     });
+
+    await syncState(updates);
 
     setMoveMode(false);
   } finally {
@@ -343,21 +355,34 @@ const newTurnCount = isNewRound ? gameData.turnCount + 1 : gameData.turnCount;
 
   useEffect(() => {
     if (!user || !lobbyCode) return;
+
     const lobbyRef = doc(db, 'artifacts', globalAppId, 'public', 'data', 'lobbies', lobbyCode);
+
     const unsubscribe = onSnapshot(lobbyRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setGameData(data);
-        if (data.gameState === 'PLAYING' && appStatus !== 'PLAYING') setAppStatus('PLAYING');
-      } else {
-        if (appStatus !== 'MENU') {
-          setErrorMsg("ไม่พบห้องนี้ หรือห้องถูกปิดแล้ว");
-          setAppStatus('MENU');
+
+        // ไม่ใส่ appStatus ใน dependency ของ listener
+        // เพื่อลดการ subscribe ใหม่บ่อย ๆ โดยเฉพาะบนมือถือ
+        if (data.gameState === 'PLAYING') {
+          setAppStatus('PLAYING');
+        } else if (data.gameState === 'LOBBY') {
+          setAppStatus('LOBBY');
+        } else if (data.gameState === 'WON' || data.gameState === 'LOST') {
+          setAppStatus('PLAYING');
         }
+      } else {
+        setErrorMsg("ไม่พบห้องนี้ หรือห้องถูกปิดแล้ว");
+        setAppStatus('MENU');
       }
+    }, (err) => {
+      console.error('FIREBASE SNAPSHOT ERROR:', err);
+      setErrorMsg(err.message);
     });
+
     return () => unsubscribe();
-  }, [user, lobbyCode, appStatus]);
+  }, [user, lobbyCode]);
 
   useEffect(() => {
     if (appStatus !== 'PLAYING' || !gameData?.turnEndTime) return;
@@ -460,19 +485,27 @@ const newTurnCount = isNewRound ? gameData.turnCount + 1 : gameData.turnCount;
   const claimedIds = getClaimedCharacterIds(gameData.players);
   const firstTurnIndex = claimedIds[0] ?? 0;
 
-  await syncState({
+  const updates = {
     gameState: 'PLAYING',
     turnIndex: firstTurnIndex,
     turnEndTime: Date.now() + 30 * 1000,
-    logs: [
+    logs: limitLogs([
       ...gameData.logs,
       {
         id: Date.now(),
         msg: "=== ภารกิจเริ่มต้น! โปรดรักษาเมืองไว้ให้ได้ ===",
         type: "system"
       }
-    ]
+    ])
+  };
+
+  setGameData({
+    ...gameData,
+    ...updates
   });
+  setAppStatus('PLAYING');
+
+  await syncState(updates);
 
   setIsLoading(false);
 };
@@ -485,7 +518,18 @@ const newTurnCount = isNewRound ? gameData.turnCount + 1 : gameData.turnCount;
     if (char.time < cost) return;
     let newChars = [...gameData.characters];
     newChars[gameData.turnIndex] = { ...char, time: char.time - cost, location: zoneName };
-    syncState({ characters: newChars, studentFreeMove: cost === 0 ? false : gameData.studentFreeMove, logs: [...gameData.logs, { id: Date.now(), msg: `${getRoleLabel(char.role)} เดินทางไปที่ ${getZoneLabel(zoneName)}`, type: 'normal' }] });
+    syncState({
+      characters: newChars,
+      studentFreeMove: cost === 0 ? false : gameData.studentFreeMove,
+      logs: limitLogs([
+        ...gameData.logs,
+        {
+          id: Date.now(),
+          msg: `${getRoleLabel(char.role)} เดินทางไปที่ ${getZoneLabel(zoneName)}`,
+          type: 'normal'
+        }
+      ])
+    });
     setMoveMode(false);
   };
 
@@ -499,7 +543,17 @@ const newTurnCount = isNewRound ? gameData.turnCount + 1 : gameData.turnCount;
     else if (char.location === 'Industrial') moneyGain += 1;
     let newChars = [...gameData.characters];
     newChars[gameData.turnIndex] = { ...char, time: char.time - 1, money: Math.min(char.maxMoney, char.money + moneyGain), mh: Math.max(0, char.mh - mhLoss) };
-    syncState({ characters: newChars, logs: [...gameData.logs, { id: Date.now(), msg: `${getRoleLabel(char.role)} ทำงานที่${getZoneLabel(char.location)}: ได้เงิน +${moneyGain}, สุขภาพจิต -${mhLoss}`, type: 'normal' }] });
+    syncState({
+      characters: newChars,
+      logs: limitLogs([
+        ...gameData.logs,
+        {
+          id: Date.now(),
+          msg: `${getRoleLabel(char.role)} ทำงานที่${getZoneLabel(char.location)}: ได้เงิน +${moneyGain}, สุขภาพจิต -${mhLoss}`,
+          type: 'normal'
+        }
+      ])
+    });
   };
 
   const handleRest = () => {
@@ -517,7 +571,17 @@ const newTurnCount = isNewRound ? gameData.turnCount + 1 : gameData.turnCount;
     } else {
       newChars[gameData.turnIndex] = { ...char, time: char.time - 1, mh: Math.min(char.maxMh, char.mh + baseHeal) };
     }
-    syncState({ characters: newChars, logs: [...gameData.logs, { id: Date.now(), msg: `${getRoleLabel(char.role)} พักผ่อน: สุขภาพจิต +${baseHeal}`, type: 'good' }] });
+    syncState({
+      characters: newChars,
+      logs: limitLogs([
+        ...gameData.logs,
+        {
+          id: Date.now(),
+          msg: `${getRoleLabel(char.role)} พักผ่อน: สุขภาพจิต +${baseHeal}`,
+          type: 'good'
+        }
+      ])
+    });
   };
 
   const handleFix = () => {
@@ -531,7 +595,18 @@ const newTurnCount = isNewRound ? gameData.turnCount + 1 : gameData.turnCount;
     if (Math.random() > 0.5) updatedChar.money = Math.min(char.maxMoney, char.money + 1);
     else updatedChar.mh = Math.min(char.maxMh, char.mh + 1);
     newChars[gameData.turnIndex] = updatedChar;
-    syncState({ zones: { ...gameData.zones, [char.location]: zoneCrises }, characters: newChars, logs: [...gameData.logs, { id: Date.now(), msg: `${getRoleLabel(char.role)} ช่วยแก้ปัญหาในพื้นที่สำเร็จ`, type: 'good' }] });
+    syncState({
+      zones: { ...gameData.zones, [char.location]: zoneCrises },
+      characters: newChars,
+      logs: limitLogs([
+        ...gameData.logs,
+        {
+          id: Date.now(),
+          msg: `${getRoleLabel(char.role)} ช่วยแก้ปัญหาในพื้นที่สำเร็จ`,
+          type: 'good'
+        }
+      ])
+    });
   };
 
   const handlePassPolicy = (policy) => {
@@ -541,7 +616,18 @@ const newTurnCount = isNewRound ? gameData.turnCount + 1 : gameData.turnCount;
     let newChars = [...gameData.characters];
     newChars[gameData.turnIndex] = { ...activeChar, time: activeChar.time - policy.costTime, money: activeChar.money - policy.costMoney };
     const newPolicies = { ...gameData.policies, [policy.id]: true };
-    syncState({ characters: newChars, policies: newPolicies, logs: [...gameData.logs, { id: Date.now(), msg: `สำเร็จ: ผ่านนโยบาย "${policy.name}" แล้ว`, type: 'critical' }] });
+    syncState({
+      characters: newChars,
+      policies: newPolicies,
+      logs: limitLogs([
+        ...gameData.logs,
+        {
+          id: Date.now(),
+          msg: `สำเร็จ: ผ่านนโยบาย "${policy.name}" แล้ว`,
+          type: 'critical'
+        }
+      ])
+    });
   };
 
   const myTurn = isMyTurn();

@@ -1,6 +1,6 @@
 {
-  "homepage": "https://github.com/wittysworkspace/poleveryday.git",
-  "name": "pol-game",
+  "homepage": "https://poleveryday.github.io/poleveryday/",
+  "name": "poleveryday",
   "private": true,
   "version": "0.0.0",
   "type": "module",
