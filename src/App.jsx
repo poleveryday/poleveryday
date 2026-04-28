@@ -1363,7 +1363,7 @@ const handleLeaveLobby = () => {
     {renderContent()}
 
     <div className="fixed bottom-2 left-4 text-[9px] sm:text-xs text-slate-500/50 font-mono z-[100] pointer-events-none">
-      beta version 1.15
+      version 1.16
     </div>
 
     {/* DEBUG ONLY - ถ้าจะส่งงานจริงให้เปลี่ยน SHOW_DEBUG_BUTTONS เป็น false */}
