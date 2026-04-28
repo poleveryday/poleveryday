@@ -1262,7 +1262,7 @@ const handleLeaveLobby = () => {
     </div>
 
     {/* DEBUG ONLY - ถ้าจะส่งงานจริงให้เปลี่ยน SHOW_DEBUG_BUTTONS เป็น false */}
-    {SHOW_DEBUG_BUTTONS && (
+    {/*SHOW_DEBUG_BUTTONS && (
       <div className="fixed bottom-20 right-4 z-[999] flex gap-2">
         <button
           onClick={() => {
@@ -1292,7 +1292,7 @@ const handleLeaveLobby = () => {
           TEST LOSE
         </button>
       </div>
-    )}
+    )*/}
   </>
 );
 }
